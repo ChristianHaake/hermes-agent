@@ -256,6 +256,36 @@ def test_read_worker_log_tail(kanban_home):
 # Max-runtime enforcement (item 1 from the Multica audit)
 # ---------------------------------------------------------------------------
 
+def test_max_runtime_terminates_legacy_unlimited_worker(kanban_home):
+    killed = []
+    original_alive = kb._pid_alive
+    kb._pid_alive = lambda pid: False
+
+    try:
+        with kbc.connect() as conn:
+            tid = kb.create_task(conn, title="legacy job", assignee="worker")
+            kb.claim_task(conn, tid)
+            kbd._set_worker_pid(conn, tid, os.getpid())
+            old_started = int(time.time()) - kb.DEFAULT_MAX_RUNTIME_SECONDS - 1
+            with kb.write_txn(conn):
+                conn.execute(
+                    "UPDATE tasks SET max_runtime_seconds = NULL, started_at = ? WHERE id = ?",
+                    (old_started, tid),
+                )
+                conn.execute(
+                    "UPDATE task_runs SET started_at = ? "
+                    "WHERE id = (SELECT current_run_id FROM tasks WHERE id = ?)",
+                    (old_started, tid),
+                )
+
+            assert tid in kbd.enforce_max_runtime(
+                conn, signal_fn=lambda pid, sig: killed.append((pid, sig))
+            )
+            assert killed
+    finally:
+        kb._pid_alive = original_alive
+
+
 def test_max_runtime_terminates_overrun_worker(kanban_home):
     """A running task whose elapsed time exceeds max_runtime_seconds gets
     SIGTERM'd, emits a ``timed_out`` event, and goes back to ready."""

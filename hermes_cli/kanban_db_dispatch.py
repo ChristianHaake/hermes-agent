@@ -660,7 +660,7 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
         "       t.max_runtime_seconds, t.claim_lock "
         "FROM tasks t "
         "LEFT JOIN task_runs r ON r.id = t.current_run_id "
-        "WHERE t.status = 'running' AND t.max_runtime_seconds IS NOT NULL "
+        "WHERE t.status = 'running' "
         "  AND COALESCE(r.started_at, t.started_at) IS NOT NULL "
         "  AND t.worker_pid IS NOT NULL"
     ).fetchall()
@@ -674,7 +674,7 @@ def enforce_max_runtime(conn: sqlite3.Connection, *, signal_fn=None) -> list[str
         # Runtime is per attempt: ``tasks.started_at`` records the FIRST start,
         # so retries must be measured from the active task_runs row.
         elapsed = now - (_kb._to_epoch(row["active_started_at"]) or now)  # unreadable clock: never kill
-        limit = int(row["max_runtime_seconds"])
+        limit = _kb.resolve_max_runtime_seconds(row["max_runtime_seconds"])
         if elapsed < limit:
             continue
 

@@ -181,7 +181,7 @@ def _insert_decomposed_child(
     ``<repo>/.worktrees/<child-id>`` per child from the board anchor.
     """
     from hermes_cli.kanban_db import (
-        _new_task_id, _canonical_assignee, _append_event,
+        DEFAULT_MAX_RUNTIME_SECONDS, _new_task_id, _canonical_assignee, _append_event,
     )
 
     root_ws_kind = root_row["workspace_kind"] or "scratch"
@@ -199,11 +199,12 @@ def _insert_decomposed_child(
     conn.execute(
         "INSERT INTO tasks "
         "(id, title, body, assignee, status, workspace_kind, "
-        " workspace_path, tenant, created_at, created_by) "
-        "VALUES (?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?)",
+        " workspace_path, max_runtime_seconds, tenant, created_at, created_by) "
+        "VALUES (?, ?, ?, ?, 'todo', ?, ?, ?, ?, ?, ?)",
         (
             new_id, child["title"].strip(), body if isinstance(body, str) else None,
             _canonical_assignee(child.get("assignee")), child_ws_kind, child_ws_path,
+            DEFAULT_MAX_RUNTIME_SECONDS,
             root_row["tenant"], now, (author or "decomposer"),
         ),
     )

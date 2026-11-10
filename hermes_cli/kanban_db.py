@@ -34,6 +34,19 @@ from toolsets import get_toolset_names
 
 _log = logging.getLogger(__name__)
 
+DEFAULT_MAX_RUNTIME_SECONDS = 3600
+
+
+def resolve_max_runtime_seconds(value: Any) -> int:
+    """Return a positive runtime cap, defaulting invalid legacy values."""
+    if isinstance(value, bool):
+        return DEFAULT_MAX_RUNTIME_SECONDS
+    try:
+        runtime = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_RUNTIME_SECONDS
+    return runtime if runtime > 0 else DEFAULT_MAX_RUNTIME_SECONDS
+
 
 # --- Shared micro-helpers (row access, JSON, env, git) ---
 
@@ -1219,6 +1232,7 @@ def create_task(
         conn, project_id, project_source_task_id, workspace_kind, workspace_path
     )
     parents = tuple(p for p in parents if p)
+    max_runtime_seconds = resolve_max_runtime_seconds(max_runtime_seconds)
     skills_list = _normalize_task_skills(skills)
 
     # Idempotency check BEFORE the write txn (no lock held); a concurrent-create
